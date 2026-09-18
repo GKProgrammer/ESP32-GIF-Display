@@ -25,8 +25,11 @@ File gifFile;
 File uploadFile;
 
 const char* GIF_FILENAME = "/current.gif";
-bool deleteRequested = false;
-const size_t MAX_FILE_SIZE = 2936012; // 2.8 MB limit in bytes
+const char* TEMP_FILENAME = "/temp.gif";
+bool deleteRequested = false; 
+bool swapRequested = false;
+
+const size_t MAX_FILE_SIZE = 2936012; 
 size_t totalBytesWritten = 0;
 bool uploadFailed = false;
 
@@ -197,18 +200,20 @@ void handleFileUpload() {
   
   if (upload.status == UPLOAD_FILE_START) {
     deleteRequested = false; 
-    uploadFailed = false;     // Reset the failure flag
-    totalBytesWritten = 0;    // Reset the byte counter
+    swapRequested = false;
+    uploadFailed = false;     
+    totalBytesWritten = 0;    
     
     display.clearDisplay();
     display.setCursor(0,20);
     display.println("Uploading...");
     display.display();
     
-    uploadFile = LittleFS.open(GIF_FILENAME, FILE_WRITE);
+    // Write to a temporary file so we don't crash the currently playing GIF
+    uploadFile = LittleFS.open(TEMP_FILENAME, FILE_WRITE);
     
   } else if (upload.status == UPLOAD_FILE_WRITE) {
-    if (uploadFailed) return; // Ignore chunks if limit is already breached
+    if (uploadFailed) return; 
     
     totalBytesWritten += upload.currentSize;
     
@@ -217,7 +222,7 @@ void handleFileUpload() {
       if (uploadFile) {
         uploadFile.close();
       }
-      LittleFS.remove(GIF_FILENAME); // Purge the partial file from memory
+      LittleFS.remove(TEMP_FILENAME); // Delete the failed temp file
       Serial.println("Upload aborted: File exceeds 2.8MB.");
       return;
     }
@@ -231,15 +236,16 @@ void handleFileUpload() {
       uploadFile.close();
     }
     
-    // Update the OLED if the backend killed the file
     if (uploadFailed) {
       display.clearDisplay();
       display.setCursor(0,20);
       display.println("File Too Large!");
       display.display();
-      delay(3000);
+      delay(3000); 
       display.clearDisplay();
       display.display();
+    } else {
+      swapRequested = true;
     }
   }
 }
@@ -305,7 +311,7 @@ void setup() {
   }
   Serial.println("\nConnected!");
 
-  if (!MDNS.begin("esp32gif")) {   // Set the hostname to "esp32gif"
+  if (!MDNS.begin("esp32gif")) {   // Set the hostname to "esp32gif" (YOU CAN CHANGE THIS TO YOUR PERSONAL PREFERENCE!)
     Serial.println("Error setting up MDNS responder!");
   } else {
     Serial.println("mDNS responder started");
@@ -331,10 +337,11 @@ void setup() {
 void loop() {
   server.handleClient();
 
+  // 1. Handle Memory Clear Requests
   if (deleteRequested) {
-    if (LittleFS.exists(GIF_FILENAME)) {
-      LittleFS.remove(GIF_FILENAME);
-    }
+    if (LittleFS.exists(GIF_FILENAME)) LittleFS.remove(GIF_FILENAME);
+    if (LittleFS.exists(TEMP_FILENAME)) LittleFS.remove(TEMP_FILENAME);
+    
     display.clearDisplay();
     display.setCursor(0, 20);
     display.println("Memory Cleared");
@@ -345,16 +352,29 @@ void loop() {
     deleteRequested = false;
   }
 
-  if (LittleFS.exists(GIF_FILENAME) && !deleteRequested) {
+  // 2. Handle File Swaps after a successful upload
+  if (swapRequested) {
+    if (LittleFS.exists(GIF_FILENAME)) {
+      LittleFS.remove(GIF_FILENAME); // Delete the old GIF
+    }
+    LittleFS.rename(TEMP_FILENAME, GIF_FILENAME); // Promote the temp GIF to current
+    swapRequested = false;
+  }
+
+  // 3. Play the GIF
+  if (LittleFS.exists(GIF_FILENAME) && !deleteRequested && !swapRequested) {
     if (gif.open(GIF_FILENAME, GIFOpenFile, GIFCloseFile, GIFReadFile, GIFSeekFile, GIFDraw)) {
+      
+      // Loop through all frames
       while (gif.playFrame(true, NULL)) {
         server.handleClient(); 
-        if (deleteRequested) {
+        if (deleteRequested || swapRequested) {
           break; 
         }
         display.display();
       }
-      gif.close();
+      
+      gif.close(); // Gracefully closes the file, freeing it up for deletion/swapping
     }
   }
 }
