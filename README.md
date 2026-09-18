@@ -3,5 +3,5 @@ You can access the ESP locally on the network using the address: esp32gif.local
 The code also lets you clear the memory if ever want to do so.
 
 IMPORTANT SIDE NOTES:
--Please make sure you install the required libraries mentioned in the REQUIREMENTS.txt file for the code to work properly.
--Make sure to set your own SSID and Password correctly where mentioned in the code as without them, the code will not work.
+- Please make sure you install the required libraries mentioned in the REQUIREMENTS.txt file for the code to work properly.
+- Make sure to set your own SSID and Password correctly where mentioned in the code as without them, the code will not work.
