@@ -4,4 +4,15 @@ AnimatedGIF.h
 Adafruit_SSD1306.h
 Adafruit_GFX.h
 
+SSD1306 OLED Display Pin Connections:
+
+- GND -----> GND
+- VCC -----> 3.3V
+- SCL -----> GPIO22
+- SDA -----> GPIO21
+
+Before compiling and uploading the code, make sure that you have selected the "ESP32 Dev Module" as the Board.
+
+Change the Partitioning Scheme to "No OTA (1MB APP / 3MB SPIFFS)" as it allows for the higher 2.8MB file size in ESP32 DEVKIT Boards.
+
 Also, make sure to set the Wi-Fi SSID and Password correctly in the code.
